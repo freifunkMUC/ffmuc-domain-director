@@ -9,36 +9,35 @@ from peewee import SqliteDatabase
 import domain_director.blueprints
 from domain_director.db import create_tables, distribute_nodes_remote_meshviewer
 from domain_director.db.model import db, Mesh, Node
-from domain_director.domain import load_domain_polygons
+from domain_director.director import Director
+from domain_director.geo.MozillaProvider import MozillaProvider
 
 
-def create_app(config, testing=False):
-    tmpl_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
-    app = Flask('domain-director', template_folder=tmpl_dir)
-    app.testing = testing
+def setup_geo_provider(config):
+    if config["provider"] == "mozilla":
+        return MozillaProvider(config)
 
-    app.config.update(dict(
-        GEOJSON_FILE="geojson.json",
-        MLS_API_KEY="test",
-        DOMAIN_SWITCH_TIME=1600000000,
-        DEFAULT_DOMAIN="default",
-        SQLITE_PATH=":memory:",
-        UPDATE_INTERVAL=-1,
-        ONLY_MIGRATE_VPN=False,
-    ))
-    app.config.update(config or {})
-    app.config.from_envvar('DOMAIN_DIRECTOR_SETTINGS', silent=True)
+    raise NotImplementedError
 
-    with open(app.config["GEOJSON_FILE"], "r") as f:
-        app.domain_polygons = load_domain_polygons(f.read())
 
-    setup_database(app)
-    register_blueprints(app)
+def setup_database(config, testing):
+    db.initialize(SqliteDatabase(config["sqlite_path"]))
+    if not Node.table_exists() and not Mesh.table_exists():
+        create_tables(db)
+        if not testing:
+            distribute_nodes_remote_meshviewer(config["meshviewer_json_url"], True)
+    else:
+        if not testing:
+            distribute_nodes_remote_meshviewer(config["meshviewer_json_url"], False)
+
+
+def setup_director(geo_provider, config, testing):
+    setup_database(config, testing)
 
     def update_nodes():
         distribute_nodes_remote_meshviewer(app.config["MESHVIEWER_JSON_URL"], False)
 
-    if app.config["UPDATE_INTERVAL"] > 0:
+    if config["update_interval"] > 0:
         scheduler = BackgroundScheduler()
         scheduler.start()
         scheduler.add_job(
@@ -49,19 +48,24 @@ def create_app(config, testing=False):
             replace_existing=True)
         atexit.register(lambda: scheduler.shutdown())
 
+    with open(config["geojson"], "r") as f:
+        return Director(config, geo_provider, f.read())
+
+
+def create_app(config, testing=False):
+    tmpl_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
+    app = Flask('domain-director', template_folder=tmpl_dir)
+    app.testing = testing
+
+    app.config.update(config)
+
+    app.geo_provider = setup_geo_provider(app.config["geo"])
+
+    if app.config.get("director", None) is not None:
+        app.director = setup_director(app.geo_provider, app.config["director"], app.testing)
+
+    app.register_blueprint(domain_director.blueprints.bp)
+
     return app
 
 
-def setup_database(app):
-    db.initialize(SqliteDatabase(app.config["SQLITE_PATH"]))
-    if not Node.table_exists() and not Mesh.table_exists():
-        create_tables(db)
-        if not app.testing:
-            distribute_nodes_remote_meshviewer(app.config["MESHVIEWER_JSON_URL"], True)
-    else:
-        if not app.testing:
-            distribute_nodes_remote_meshviewer(app.config["MESHVIEWER_JSON_URL"], False)
-
-
-def register_blueprints(app):
-    app.register_blueprint(domain_director.blueprints.bp)
