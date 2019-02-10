@@ -32,6 +32,6 @@ setup(
     ],
     packages=find_packages(),
     entry_points={
-        'console_scripts': ['domain-director=domain_director:cli.run']
+        'console_scripts': ['domain-director=director:cli.run']
     },
 )
