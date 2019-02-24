@@ -44,14 +44,14 @@ def setup_director(geo_provider, config, testing):
     setup_database(config, testing)
 
     def update_nodes():
-        distribute_nodes_remote_meshviewer(app.config["MESHVIEWER_JSON_URL"], False)
+        distribute_nodes_remote_meshviewer(config["meshviewer_json_url"], False)
 
     if config["update_interval"] > 0:
         scheduler = BackgroundScheduler()
         scheduler.start()
         scheduler.add_job(
             func=update_nodes,
-            trigger=IntervalTrigger(seconds=app.config["UPDATE_INTERVAL"]),
+            trigger=IntervalTrigger(seconds=config["update_interval"]),
             id='update_meshviewer_job',
             name='Update nodes from meshviewer instance',
             replace_existing=True)
