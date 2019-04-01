@@ -25,9 +25,11 @@ def setup_geo_provider(config):
 
 def migrate_database():
     migrator = SqliteMigrator(db)
-    migrate(
-        migrator.add_column('meshes', 'switch_time', Mesh.switch_time),
-    )
+    mesh_columns = [e.name for e in db.get_columns('meshes')]
+    if 'switch_time' not in mesh_columns:
+        migrate(
+            migrator.add_column('meshes', 'switch_time', Mesh.switch_time),
+        )
 
 def setup_database(config, testing):
     db.initialize(SqliteDatabase(config["sqlite_path"]))
