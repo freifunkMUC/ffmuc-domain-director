@@ -1,0 +1,16 @@
+version: "2"
+
+
+services:
+
+  app:
+    build:
+      context: ./
+    ports:
+      - "28530:28530"
+    restart: unless-stopped
+    volumes:
+      - /srv/docker/ffmuc-domain-director/config.yml:/domain-director/config.yml:ro
+      - /srv/docker/ffmuc-domain-director/data:/director-data:rw
+      - /etc/localtime:/etc/localtime:ro
+
