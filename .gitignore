@@ -1,9 +1,11 @@
 .idea/
 build/
 dist/
+/data/
 *.egg-info/
 *.pyc
 *.db
+**/.*.swp
 config.yml
 /domains.geojson
 /domains.json
